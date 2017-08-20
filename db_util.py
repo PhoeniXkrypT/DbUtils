@@ -41,9 +41,12 @@ class DbManager(object):
         self.cursor = self.conn.cursor()
 
     def commit(self):
-        if not self.conn:
-            raise DbManagerException('Connection to database is closed')
-        self.conn.commit()
+        try:
+            self.conn.commit()
+        except AttributeError, e:
+            raise DbManagerException('Connection to database is closed', str(e))
+        except pymysql.err.InterfaceError, e:
+            raise DbManagerException('Connection to database is closed', str(e))
 
     def create_db(self, dbname):
         self.logger.info('Creating db: %s', dbname)
@@ -51,10 +54,15 @@ class DbManager(object):
             self.cursor.execute(DbManager.DB_CREATE %(dbname))
         except pymysql.err.ProgrammingError, e:
             raise DbManagerException('Error creating %s database' % dbname, str(e))
+        except pymysql.err.InterfaceError, e:
+            raise DbManagerException('Connection to database is closed', str(e))
 
     def delete_db(self, dbname):
         self.logger.info('Deleting db: %s', dbname)
-        self.cursor.execute(DbManager.DB_DROP %(dbname))
+        try:
+            self.cursor.execute(DbManager.DB_DROP %(dbname))
+        except pymysql.err.InterfaceError, e:
+            raise DbManagerException('Connection to database is closed', str(e))
 
     def recreate_db(self, dbname):
         self.delete_db(dbname)
@@ -70,7 +78,10 @@ class DbManager(object):
 
     def use_db(self, dbname):
         self.logger.info('Current db: %s', dbname)
-        self.cursor.execute(DbManager.DB_USE %(dbname))
+        try:
+            self.cursor.execute(DbManager.DB_USE %(dbname))
+        except pymysql.err.InterfaceError, e:
+            raise DbManagerException('Connection to database is closed', str(e))
 
     def create_table(self, table_name, column_info):
         self.logger.info('Creating table: %s', table_name )
@@ -78,6 +89,8 @@ class DbManager(object):
             self.cursor.execute(DbManager.DB_CREATE_TABLE % (table_name, column_info))
         except pymysql.err.InternalError, e:
             raise DbManagerException('Error creating %s table' % table_name, str(e))
+        except pymysql.err.InterfaceError, e:
+            raise DbManagerException('Connection to database is closed', str(e))
 
     def insert_table_data(self, table_name, cols, vals):
         self.logger.info('Inserting values into %s', table_name)
@@ -88,12 +101,17 @@ class DbManager(object):
             self.cursor.execute(sql_str, tuple(vals))
         except pymysql.err.IntegrityError, e:
             raise DbManagerException('Duplicate entry ', str(e))
+        except pymysql.err.InterfaceError, e:
+            raise DbManagerException('Connection to database is closed', str(e))
         self.commit()
 
     def select_table_data(self, table_name, cols):
         self.logger.info('Select values from %s', table_name)
         cols = ', '.join(['`'+i+'`' for i in cols])
         sql_str = (DbManager.DB_SELECT + table_name) % (cols)
-        self.cursor.execute(sql_str)
-        return self.cursor.fetchall()
+        try:
+            self.cursor.execute(sql_str)
+            return self.cursor.fetchall()
+        except pymysql.err.InterfaceError, e:
+            raise DbManagerException('Connection to database is closed', str(e))
 
