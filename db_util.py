@@ -13,6 +13,7 @@ class DbManager(object):
     DB_CREATE_TABLE = 'CREATE TABLE %s (%s) DEFAULT CHARSET=utf8'
     DB_INSERT = 'INSERT INTO %s (%s) VALUES'
     DB_SELECT = 'SELECT %s FROM '
+
     def __init__(self, host, user, password, loglvl=logging.INFO):
         self.conn = None
         self.cursor = None
@@ -61,7 +62,10 @@ class DbManager(object):
 
     def close(self):
         self.logger.info('Closing connection to MySQL database')
-        self.conn.close()
+        try:
+            self.conn.close()
+        except AttributeError, e:
+            raise DbManagerException('Connection already closed.', str(e))
         self.conn = None
 
     def use_db(self, dbname):
@@ -80,7 +84,10 @@ class DbManager(object):
         cols = ', '.join(['`'+i+'`' for i in cols])
         sql_str = DbManager.DB_INSERT % (table_name, cols) +\
                             '('+ '%s, '*(len(vals) - 1)+'%s)'
-        self.cursor.execute(sql_str, tuple(vals))
+        try:
+            self.cursor.execute(sql_str, tuple(vals))
+        except pymysql.err.IntegrityError, e:
+            raise DbManagerException('Duplicate entry ', str(e))
         self.commit()
 
     def select_table_data(self, table_name, cols):
