@@ -41,6 +41,7 @@ class DbManager(object):
         self.cursor = self.conn.cursor()
 
     def commit(self):
+        self.logger.info('Commit changes')
         try:
             self.conn.commit()
         except AttributeError, e:
